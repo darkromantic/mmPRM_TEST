@@ -6,24 +6,30 @@ import pandas as pd
 import numpy as np
 from scipy.interpolate import splprep, splev
 
+PLOT_WAYPOINTS = False
 NO_SECOND_WAYPOINT = False    
-PARAMETERS_CHOSEN = 1 
+PARAMETERS_CHOSEN = 4
+TEST_ALL_FILES = False  
 
 if PARAMETERS_CHOSEN == 1:
     from utils.parameters1 import get_parameters
 elif PARAMETERS_CHOSEN == 2:
     from utils.parameters2 import get_parameters
+elif PARAMETERS_CHOSEN == 3:
+    from utils.parameters3 import get_parameters
+elif PARAMETERS_CHOSEN == 4:
+    from utils.parameters4 import get_parameters
 
 params = get_parameters()
 ax, fig = setup_plot(params)
 waypoints = params.get('waypoints', [])
 waypoint_nodes = [tuple(wp) for wp in waypoints]
 
-# 添加障碍物和起点终点（略，保持原样）
+# 添加障碍物和起点终点
 expand_obstacles, obstacles_vertices = add_expand_obstacles(ax, params)
 real_obstacles, real_obstacles_vertices = add_real_obstacles(ax, params)
 connect_obstacles, real_obstacles_vertices = add_connect_obstacles(ax, params)
-plot_start_and_end(ax, params, NO_SECOND_WAYPOINT)
+plot_start_and_end(ax, params, NO_SECOND_WAYPOINT, PLOT_WAYPOINT=PLOT_WAYPOINTS)
 
 COLOR_MAP = {"wg": "blue", "wf": "red"}
 
@@ -98,11 +104,27 @@ def plot_segment(df, linewidth=2.0, alpha=0.7):
                        linestyle='-', 
                        linewidth=linewidth,
                        alpha=alpha,
-                       zorder=5)
+                       zorder=10)
                 current_segment = []
                 
             current_label = label
             current_segment = [coords]
+        elif coords == df['coordinates'].iloc[-1]:
+            # 如果是最后一个点，直接添加到当前段
+            current_segment.append(coords)
+            print(">>>>draw segment>>>>")
+            print(f"segment_start: {current_segment[0]}, segment_end: {current_segment[-1]}, segment_label: {current_label}\n")
+            if current_label == "wf":
+                xs, ys, zs = interpolate_wf_segment(current_segment)
+            else:
+                xs, ys, zs = zip(*current_segment)
+
+            ax.plot(xs, ys, zs, 
+                   color=COLOR_MAP[current_label],
+                   linestyle='-', 
+                   linewidth=linewidth,
+                   alpha=alpha,
+                   zorder=10)
         else:
             current_segment.append(coords)
         coords_before = coords
@@ -111,6 +133,9 @@ if PARAMETERS_CHOSEN == 1:
     folder_path = 'test1_csv'
 elif PARAMETERS_CHOSEN == 2: 
     folder_path = 'test2_csv'
+else:
+    folder_path = f'test{PARAMETERS_CHOSEN}_csv'
+
 all_files = glob.glob(os.path.join(folder_path, "*.csv"))
 for filepath in all_files:
     filename = os.path.basename(filepath)
@@ -118,7 +143,7 @@ for filepath in all_files:
     df['coordinates'] = df['points'].apply(parse_point)
     if filename.startswith('H'):
         plot_segment(df, linewidth=2.0, alpha=1)
-    else:
+    elif TEST_ALL_FILES:
         plot_segment(df, linewidth=1.0, alpha=0.3)
 
 
@@ -128,5 +153,6 @@ for filepath in all_files:
 #     plt.Line2D([0], [0], color=COLOR_MAP['wf'], label='Optimized Path')
 # ]
 # ax.legend(handles=legend_elements)
-
+ax.view_init(elev=8, azim=-70,roll=0)
+ax.text2D(0.05, 0.7, f"omega_e: {params['omega_e']}, omega_t: {params['omega_t']}", transform=ax.transAxes, fontsize=10)
 plt.show()

@@ -84,12 +84,23 @@ def create_sloped_obstacle(x_range, y_range, z_bottom, z_top_range):
 
 def get_parameters():
     params = {
-        'num_samples': 500,
+        'wg': 2,
+        'wf': 1,
+
+        'omega_e': 1,
+        'omega_t': 10,
+        'num_samples': 1000,
         'ground_ratio': 0.4,
         'R_max': 5,
-        'wg': 50,
-        'wf': 100,
         'e_factor': 0.1,
+        'pc': 19,  
+        'pf': 946,
+        'vc': 0.1,
+        'vf': 2.0,
+        'm': 2.8,
+        'et': 5.0,
+        'Wt':600,
+
         'start': (-3, -12, 6),
         'end': (22.5, 12.5, 9.51),
         'waypoints': [
@@ -98,8 +109,7 @@ def get_parameters():
             (7, 13, 10), # 标志物1
             (22.5, 12.5, 9.51), # 斜面目标点
         ],
-        
-        # 使用辅助函数生成障碍物，代码更清晰
+
         'expand_obstacles': [
             # 斜面 (使用斜面生成器)
             create_sloped_obstacle(x_range=(18, 24), y_range=(5, 20), z_bottom=8, z_top_range=(8, 10)),

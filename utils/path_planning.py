@@ -1,43 +1,74 @@
 import numpy as np
 from scipy.interpolate import splprep, splev
 
+# 计算节点间距离
+def distance(a, b):
+    return np.sqrt((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2 + (b[2] - a[2]) ** 2)
+
+def kappa_cost(omega, difference_total, c_cost):
+    return np.exp((-omega/difference_total) * c_cost)
+
+def distance_xy(point1, point2) -> float:
+    return np.sqrt((point1[0] - point2[0]) ** 2 + (point1[1] - point2[1]) ** 2)
+
+def distance_z(point1, point2) -> float:
+    return abs(point1[2] - point2[2])
+
 # MM_A* 算法
 def astar(start, goal, edges, weights, params):
     wg = params['wg']
-    wf = params['wf']
-    e = wg * params['e_factor']
+    wf= params['wf']
+    pc = params.get('pc')
+    pf = params.get('pf')
+    m = params['m']
+    g = params.get('g', 9.81)
+    vc = params.get('vc')
+    vf = params.get('vf')
+    et = params.get('et')
+    Wt = params.get('Wt')
+    omega_e = params.get('omega_e')
+    omega_t = params.get('omega_t')
 
-    def heuristic_MM(point1, point2):
+    def heuristic_t(point1, point2):
         if point1 == point2:
             return 0
         edge = frozenset([point1, point2])
         weight = weights[edge]
         if isinstance(weight, list):
-            score = heuristic(point1, point2) * weight[0] + weight[1]
+            vm = (vc + vf) / 2
+        if weight == wg:
+            vm = vc
         else:
-            score = heuristic(point1, point2) * weight
-        return score
-
-    def heuristic_H(point, goal):
-        if point == goal:
+            vm = vf
+        return distance(point1, point2) / vm
+    
+    def heuristic_e(point1, point2):
+        if point1 == point2:
             return 0
-        if point[2] == 0 and goal[2] == 0:
-            h_cost = wg * (np.sqrt((point[0] - goal[0]) ** 2 + (point[1] - goal[1]) ** 2))
-        elif point[2] == 0 and goal[2] != 0:
-            h_cost = wg * (np.sqrt((point[0] - goal[0]) ** 2 + (point[1] - goal[1]) ** 2)) + wf * abs(point[2] - goal[2]) + e
-        elif point[2] != 0 and goal[2] == 0:
-            h_cost = wg * (np.sqrt((point[0] - goal[0]) ** 2 + (point[1] - goal[1]) ** 2)) + wf * abs(point[2] - goal[2]) + e
-        elif point[2] != 0 and goal[2] != 0:
-            h_cost_1 = wg * (np.sqrt((point[0] - goal[0]) ** 2 + (point[1] - goal[1]) ** 2)) + wf * abs(point[2]) + wf * abs(goal[2]) + 2 * e
-            h_cost_2 = wf * heuristic(point, goal)
-            h_cost = min(h_cost_1, h_cost_2)
-        return h_cost
+        edge = frozenset([point1, point2])
+        weight = weights[edge]
+        if weight == wg:
+            return distance_xy(point1, point2) * pc/vc
+        else:
+            return distance_xy(point1, point2) * pf/vf + distance_z(point1, point2) * m * g 
+        
+    def heuristic_H_e(point, goal):
+        return pc * distance_xy(point, goal)/vc + pf * distance_z(point, goal)/vf + m * g * distance_z(point, goal) + Wt
+    
+    def heuristic_H_t(point, goal):
+        return  distance_xy(point, goal)/vc + distance_z(point, goal)/vf + et
 
+    def g_fun(point1, point2):
+        return kappa_cost(omega_e, heuristic_H_e(start, goal), heuristic_e(point1, point2)) + kappa_cost(omega_t, heuristic_H_t(start, goal), heuristic_t(point1, point2))
+    
+    def h_fun(point, goal):
+        return kappa_cost(omega_e, heuristic_H_e(start, goal), heuristic_H_e(point, goal)) + kappa_cost(omega_t, heuristic_H_t(start, goal), heuristic_H_t(point, goal))
+    
     open_set = set()
     closed_set = set()
     came_from = {}
     g_score = {start: 0}
-    f_score = {start: heuristic_H(start, goal)}
+    f_score = {start: h_fun(start, goal)}
 
     open_set.add(start)
 
@@ -56,7 +87,7 @@ def astar(start, goal, edges, weights, params):
         closed_set.add(current)
 
         for neighbor in edges[current]:
-            tentative_g_score = g_score[current] + heuristic_MM(current, neighbor)
+            tentative_g_score = g_score[current] + g_fun(current, neighbor)
 
             if neighbor in closed_set:
                 continue
@@ -69,13 +100,9 @@ def astar(start, goal, edges, weights, params):
 
             came_from[neighbor] = current
             g_score[neighbor] = tentative_g_score
-            f_score[neighbor] = tentative_g_score + heuristic_H(neighbor, goal)
+            f_score[neighbor] = tentative_g_score + h_fun(neighbor, goal)
 
     return None
-
-# 计算节点间距离
-def heuristic(a, b):
-    return np.sqrt((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2 + (b[2] - a[2]) ** 2)
 
 def smooth_path(path, type, smoothing_factor=5, spline_degree=3):
     """使用B样条插值平滑给定路径，并确保起点和终点处的切线沿z轴方向且更加明显。
