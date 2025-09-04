@@ -6,7 +6,7 @@ def distance(a, b):
     return np.sqrt((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2 + (b[2] - a[2]) ** 2)
 
 def kappa_cost(omega, difference_total, c_cost):
-    return np.exp((-omega/difference_total) * c_cost)
+    return np.exp(( omega/difference_total) * c_cost)
 
 def distance_xy(point1, point2) -> float:
     return np.sqrt((point1[0] - point2[0]) ** 2 + (point1[1] - point2[1]) ** 2)

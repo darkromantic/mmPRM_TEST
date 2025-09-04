@@ -100,8 +100,8 @@ def get_parameters():
         'wg': 2,
         'wf': 1,
 
-        'omega_e': 1000,
-        'omega_t': 1,
+        'omega_e': 1,
+        'omega_t': 1.2,
         'num_samples': 1000,
         'ground_ratio': 0.4,
         'R_max': 5,
