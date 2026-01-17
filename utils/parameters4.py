@@ -37,7 +37,7 @@ def create_cuboid_obstacle(min_corner, max_corner):
     
     return {'vertices': vertices, 'faces': faces}
 
-def create_sloped_obstacle(x_range, y_range, z_bottom, z_top_range):
+def create_sloped_obstacle(x_range, y_range, z_bottom, z_top_range, sur_axe):
     """
     创建一个顶部倾斜的障碍物（类似您代码中的“斜面”）。
     
@@ -54,19 +54,32 @@ def create_sloped_obstacle(x_range, y_range, z_bottom, z_top_range):
     y_start, y_end = y_range
     z_top_start, z_top_end = z_top_range
 
-    # 定义8个顶点
-    vertices = [
-        # Top face (z varies)
-        [x_start, y_end,   z_top_start], # 0
-        [x_start, y_start, z_top_start], # 1
-        [x_end,   y_start, z_top_end],   # 2
-        [x_end,   y_end,   z_top_end],   # 3
-        # Bottom face (z is constant)
-        [x_start, y_end,   z_bottom],    # 4
-        [x_start, y_start, z_bottom],    # 5
-        [x_end,   y_start, z_bottom],    # 6
-        [x_end,   y_end,   z_bottom]     # 7
-    ]
+    if sur_axe == 'y':
+        vertices = [
+            # Top face (z varies)
+            [x_start, y_end,   z_top_start], # 0
+            [x_start, y_start, z_top_start], # 1
+            [x_end,   y_start, z_top_end],   # 2
+            [x_end,   y_end,   z_top_end],   # 3
+            # Bottom face (z is constant)
+            [x_start, y_end,   z_bottom],    # 4
+            [x_start, y_start, z_bottom],    # 5
+            [x_end,   y_start, z_bottom],    # 6
+            [x_end,   y_end,   z_bottom]     # 7
+        ]
+    if sur_axe == 'x':
+        vertices = [
+            # Top face (z varies)
+            [x_end, y_start,   z_top_start], # 0
+            [x_start, y_start,    z_top_start], # 1
+            [x_start,   y_end, z_top_end],   # 2
+            [x_end,   y_end,   z_top_end],   # 3
+            # Bottom face (z is constant)
+            [x_end, y_start,   z_bottom],    # 4
+            [x_start, y_start, z_bottom],    # 5
+            [x_start,   y_end, z_bottom],    # 6
+            [x_end,   y_end,   z_bottom]     # 7
+        ]
 
     # 面的定义与立方体相同
     faces = [
@@ -88,7 +101,7 @@ def get_parameters():
         'wf': 1,
 
         'omega_e': 1,
-        'omega_t': 10,
+        'omega_t': 1.2,
         'num_samples': 1000,
         'ground_ratio': 0.4,
         'R_max': 5,
@@ -101,63 +114,56 @@ def get_parameters():
         'et': 5.0,
         'Wt':600,
 
-        'start': (-3, -12, 6),
-        'end': (22.5, 12.5, 9.51),
+        'start': (20, -8, 10),
+        'end': (1, 12, 8.1),
         'waypoints': [
             (-3, 2, 6), # 标志物2
             # (7, 0, 10), # 经过点
             (7, 13, 10), # 标志物1
-            (22.5, 12.5, 9.51), # 斜面目标点
+            (1, 12, 8.1), # 斜面目标点
         ],
 
         'expand_obstacles': [
-            # 斜面 (使用斜面生成器)
-            create_sloped_obstacle(x_range=(18, 24), y_range=(5, 20), z_bottom=8, z_top_range=(8, 10)),
+            # 斜面 
+            #create_sloped_obstacle(x_range=(18, 24), y_range=(5, 20), z_bottom=8, z_top_range=(8, 10), sur_axe='x'), 
             
             # 平台
             create_cuboid_obstacle((14, 3, 0), (24, 20, 8)),
 
-            # 障碍物1
-            # min_corner: (3, -3.5, 0), max_corner: (11, 16.5, 10)
-            create_cuboid_obstacle((3, -3.5, 0), (11, 16.5, 10)),
+            # 起飞平台
+            create_cuboid_obstacle((18, -15, 0), (24, -2, 10)),
 
-            # 障碍物2
-            # min_corner: (-14, -15, 0), max_corner: (-8, 5, 8)
-            create_cuboid_obstacle((-7, -15, 0), (1, 5, 6)),
+            # 降落斜面
+            create_sloped_obstacle(x_range=(10, -8), y_range=(0, 15), z_bottom=0, z_top_range=(0, 10), sur_axe='x'),
         ],
         
         'connect_obstacles': [
-            # 斜面 (使用斜面生成器)
-            create_sloped_obstacle(x_range=(18, 24), y_range=(5, 20), z_bottom=0, z_top_range=(8, 10)),
+            # 斜面 
+            # create_sloped_obstacle(x_range=(18, 24), y_range=(5, 20), z_bottom=0, z_top_range=(8, 10)),
 
-            # 障碍物1
-            # min_corner: (3, -3.5, 0), max_corner: (11, 16.5, 10)
-            create_cuboid_obstacle((4, -2.5, 0), (10, 15.5, 10)),
-
-            # 障碍物2
-            # min_corner: (-14, -15, 0), max_corner: (-8, 5, 8)
-            create_cuboid_obstacle((-6, -14, 0), (0, 4, 6)),
+            # 降落斜面
+            create_sloped_obstacle(x_range=(10, -8), y_range=(0, 15), z_bottom=0, z_top_range=(0, 10), sur_axe='x'),
+            
         ],
 
         'real_obstacles': [
-               # 斜面 (使用斜面生成器)
-            create_sloped_obstacle(x_range=(18, 24), y_range=(5, 20), z_bottom=8, z_top_range=(8, 10)),
+            # 斜面 
+            #create_sloped_obstacle(x_range=(18, 24), y_range=(5, 20), z_bottom=8, z_top_range=(8, 10), sur_axe='x'), 
             
-            # 障碍物1
+            # 平台
             create_cuboid_obstacle((14, 3, 0), (24, 20, 8)),
 
-            # 障碍物1
-            # min_corner: (3, -3.5, 0), max_corner: (11, 16.5, 10)
-            create_cuboid_obstacle((3, -3.5, 0), (11, 16.5, 10)),
+            # 起飞平台
+            create_cuboid_obstacle((18, -15, 0), (24, -2, 10)),
 
-            # 障碍物2
-            # min_corner: (-14, -15, 0), max_corner: (-8, 5, 8)
-            create_cuboid_obstacle((-7, -15, 0), (1, 5, 6)),
+            # 降落斜面
+            create_sloped_obstacle(x_range=(10, -8), y_range=(0, 15), z_bottom=0, z_top_range=(0, 10), sur_axe='x'),
+            
         ],
         
         'xlim': (-15, 24),
         'ylim': (-15, 20),
-        'zlim': (0, 18),
+        'zlim': (0, 30),
     }
     return params
 

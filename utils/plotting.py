@@ -58,7 +58,7 @@ def add_connect_obstacles(ax, params):
         # ax.add_collection3d(Poly3DCollection(faces, facecolors='blue', linewidths=1.5, edgecolors=[0.2, 0.2, 0.8], alpha=.1, linestyle='-.'))
     return real_obstacles, real_obstacles_vertices
 
-def add_real_obstacles(ax, params):
+def add_real_obstacles(ax: plt.Axes, params):
     real_obstacles = []
     real_obstacles_vertices = []
     for obstacle_params in params['real_obstacles']:
@@ -67,23 +67,23 @@ def add_real_obstacles(ax, params):
         real_obstacles_vertices.append(vertices)
         ax.add_collection3d(Poly3DCollection(
             faces,
-            facecolors='grey',
+            facecolors='lightgrey',
             linewidths=1.5,
             edgecolors=[0.1, 0.1, 0.1],
-            alpha=1.0,
+            alpha=0.5,
             linestyle='-',
             zorder=0
         ))
     return real_obstacles, real_obstacles_vertices
 
-def plot_start_and_end(ax, params, NO_SECOND_WAYPOINT=False,IS_LAST_WAYPOINT=False):
+def plot_start_and_end(ax: plt.Axes, params: dict, NO_SECOND_WAYPOINT=False,IS_LAST_WAYPOINT=False, PLOT_WAYPOINT=True):
     # 绘制起点和终点
-    ax.scatter(*params['start'], color='green', s=200, label='Start')
-    ax.scatter(*params['end'], color='blue', s=200, label='End', marker="*")
+    ax.scatter(*params['start'], color='green', s=200, label='Start',zorder = 20)
+    ax.scatter(*params['end'], color='blue', s=200, label='End', marker="*", zorder = 20)
 
     # 绘制路径点
     waypoints = params.get('waypoints', [])
-    if waypoints:
+    if PLOT_WAYPOINT:
         for i, wp in enumerate(waypoints):
             # 跳过第二个路径点 (索引为 1)
             if  NO_SECOND_WAYPOINT and i == 1:
@@ -91,12 +91,13 @@ def plot_start_and_end(ax, params, NO_SECOND_WAYPOINT=False,IS_LAST_WAYPOINT=Fal
             if not IS_LAST_WAYPOINT and i == len(waypoints) - 1:
                 continue
             # 使用红色的三角形标记代表小红旗
-            ax.scatter(wp[0], wp[1], wp[2],
+            pole_height = 0.2 # 旗杆相对于标记点的高度
+            ax.scatter(wp[0], wp[1], wp[2]+ pole_height,
                        color='red', s=80, label='Waypoint' if i == 0 else "_nolegend_", # 只为第一个旗子添加图例标签
-                       marker='^') 
+                       marker='^',
+                       zorder = 20) 
             # # 可选：为旗子添加旗杆 (如果需要更精细的旗帜外观)
-            # pole_height = 2 # 旗杆相对于标记点的高度（或深度，取决于你的坐标系）
-            # ax.plot([wp[0], wp[0]], [wp[1], wp[1]], [wp[2], wp[2] - pole_height], color='black', linewidth=1)
+            # ax.plot([wp[0], wp[0]], [wp[1], wp[1]], [wp[2], wp[2] + pole_height], color='black', linewidth=1)
 
 
     # --- 图例字体 (Arial 8号) ---
@@ -104,6 +105,21 @@ def plot_start_and_end(ax, params, NO_SECOND_WAYPOINT=False,IS_LAST_WAYPOINT=Fal
     # handles, labels = ax.get_legend_handles_labels()
     # if handles: 
     #     ax.legend(fontsize=8)
+def plot_nodes(ax: plt.Axes, sample: np.ndarray, obstacles_surface_points: np.ndarray, IS_PLOT_EDGES=False):
+    ax.view_init(elev=18, azim=-61,roll=2)  # 设置视角
+    if IS_PLOT_EDGES:
+        for point in sample:
+            ax.scatter(point[0], point[1], point[2], color='black', s=1, marker='o', zorder=1)
+    else:       
+        for point in sample:
+            if point in obstacles_surface_points:
+                print("--------in obstacles-------\n", point)
+                ax.scatter(point[0], point[1], point[2], color='green', s=10, marker='o', zorder=10)
+            elif point[2] == 0:
+                ax.scatter(point[0], point[1], point[2], color='red', s=10, marker='o', zorder=10)
+            else:
+                ax.scatter(point[0], point[1], point[2], color='blue', s=10, marker='o', zorder=10)
+        
 
 def create_polyhedron(vertices, faces_index):
     vertices = np.array(vertices)

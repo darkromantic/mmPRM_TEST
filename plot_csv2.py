@@ -6,6 +6,7 @@ import pandas as pd
 import numpy as np
 from scipy.interpolate import splprep, splev
 import re
+import ast
 
 PLOT_WAYPOINTS = False
 NO_SECOND_WAYPOINT = False    
@@ -22,17 +23,9 @@ elif PARAMETERS_CHOSEN == 4:
     from utils.parameters4 import get_parameters
 
 params = get_parameters()
-ax, fig = setup_plot(params)
+COLOR_MAP = {"wg": "blue", "wf": "red"}
 waypoints = params.get('waypoints', [])
 waypoint_nodes = [tuple(wp) for wp in waypoints]
-
-# 添加障碍物和起点终点
-expand_obstacles, obstacles_vertices = add_expand_obstacles(ax, params)
-real_obstacles, real_obstacles_vertices = add_real_obstacles(ax, params)
-connect_obstacles, real_obstacles_vertices = add_connect_obstacles(ax, params)
-plot_start_and_end(ax, params, NO_SECOND_WAYPOINT, PLOT_WAYPOINT=PLOT_WAYPOINTS)
-
-COLOR_MAP = {"wg": "blue", "wf": "red"}
 
 def parse_point(point_str):
     stripped_str = point_str.strip().replace("(", "").replace(")", "").replace("[", "").replace("]", "")
@@ -45,56 +38,39 @@ def interpolate_wf_segment(segment):
     path_array = np.array(segment)
     x, y, z = path_array[:, 0], path_array[:, 1], path_array[:, 2]
     
-    # 样条参数配置
     length = len(x)
-    spline_degree = min(3, length-1)  # 最大3次样条，根据点数自动降阶
-    smoothing_factor = 10  # 控制平滑度
-    # 添加额外的控制点以确保起点和终点处的切线沿z轴方向
-    start_point = segment[0]
-    end_point = segment[-1]
+    spline_degree = min(3, length-1)
+    smoothing_factor = 10
     
-    # 定义一个小增量，用于创建沿z轴方向的切线效果
-    epsilon = 0.5  # 增加到0.5以增强效果
-    num_control = int(len(z)/3)
+    if length > 3:
+        tck, u = splprep([x, y, z], s=smoothing_factor, k=spline_degree)
+        u_new = np.linspace(u.min(), u.max(), num=100)
+        return splev(u_new, tck)
+    else:
+        return x, y, z
 
-    for j in range(len(z)-2):
-        z[j+1] = z[j+1] + num_control * epsilon
-        
-        
-
-    for i in range(num_control): 
-        # 在起点附近添加多个控制点，使切线沿正z轴方向
-        x = np.insert(x, i+1, start_point[0])
-        y = np.insert(y, i+1, start_point[1])
-        z = np.insert(z, i+1, start_point[2] + (i+1)*epsilon)
-    
-        # 在终点附近添加多个控制点，使切线沿负z轴方向（假设你想要相反方向）
-        x = np.insert(x, -(i+1), end_point[0])
-        y = np.insert(y, -(i+1), end_point[1])
-        z = np.insert(z, -(i+1), end_point[2] + (i+1) * epsilon)
-
-    tck, u = splprep([x, y, z], s=smoothing_factor, k=spline_degree)
-    u_new = np.linspace(u.min(), u.max(), num=100)  # 生成100个插值点
-    return splev(u_new, tck)
-
-
-def plot_segment(df, linewidth=2.0, alpha=0.7):
+def plot_segment(df, ax, linewidth=2.0, alpha=0.7):
     """绘制路径段"""
     current_label = None
     current_segment = []
     coords_before = None
+    
+    df['coordinates'] = df['points'].apply(parse_point)
+    
     for _, row in df.iterrows():
         coords = row['coordinates']
         label = row['labels']
         if coords_before == coords:
             continue
+        
         print(f" point before: {coords_before}, point now: {coords}, label: {label}, current_label: {current_label}")
-        if label != current_label or tuple(coords) in waypoint_nodes:
+        
+        if label != current_label or coords in waypoint_nodes:
             if current_segment:
-                current_segment.append(coords)  # 包含路径点
+                current_segment.append(coords)
                 print(">>>>draw segment>>>>")
                 print(f"segment_start: {current_segment[0]}, segment_end: {current_segment[-1]}, segment_label: {current_label}\n")
-                # 绘制前一个段
+                
                 if current_label == "wf":
                     xs, ys, zs = interpolate_wf_segment(current_segment)
                 else:
@@ -107,11 +83,11 @@ def plot_segment(df, linewidth=2.0, alpha=0.7):
                        alpha=alpha,
                        zorder=10)
                 current_segment = []
-                
+            
             current_label = label
             current_segment = [coords]
+        
         elif coords == df['coordinates'].iloc[-1]:
-            # 如果是最后一个点，直接添加到当前段
             current_segment.append(coords)
             print(">>>>draw segment>>>>")
             print(f"segment_start: {current_segment[0]}, segment_end: {current_segment[-1]}, segment_label: {current_label}\n")
@@ -130,18 +106,11 @@ def plot_segment(df, linewidth=2.0, alpha=0.7):
             current_segment.append(coords)
         coords_before = coords
 
-if PARAMETERS_CHOSEN == 1:
-    folder_path = 'test1_csv'
-elif PARAMETERS_CHOSEN == 2: 
-    folder_path = 'test2_csv'
-else:
-    folder_path = f'test{PARAMETERS_CHOSEN}_csv'
-
 def take_omega(filename):
     """
     从文件名中提取 omega_t, omega_e 和 points 参数。
     """
-    pattern = r"omega_t([\d.]+)_omega_e([\d.]+)_points(\d+)\.csv"   
+    pattern = r"omega_t([\d.]+)_omega_e([\d.]+)_points(\d+)\.csv"
     match = re.search(pattern, filename)
 
     if match:
@@ -150,16 +119,24 @@ def take_omega(filename):
         points = int(match.group(3))
         return omega_t, omega_e, points
     else:
-        # 如果没有找到匹配项，优雅地处理这个错误
         print(f"文件名格式不匹配，无法提取参数: {filename}")
         return None, None, None
 
+# --- 主要执行部分 ---
+if PARAMETERS_CHOSEN == 1:
+    folder_path = 'test1_csv'
+elif PARAMETERS_CHOSEN == 2: 
+    folder_path = 'test2_csv'
+else:
+    folder_path = f'test{PARAMETERS_CHOSEN}_csv'
 
 all_files = glob.glob(os.path.join(folder_path, "*.csv"))
 
-for filepath in all_files: 
+# **关键修改**：在循环外只创建一次图表
+
+for filepath in all_files:
     # **关键修改**：在每次循环开始时清空图表内容
-    ax.clear()
+    ax, fig = setup_plot(params)
     
     # 重新添加障碍物和起点终点
     expand_obstacles, obstacles_vertices = add_expand_obstacles(ax, params)
@@ -168,19 +145,18 @@ for filepath in all_files:
     plot_start_and_end(ax, params, NO_SECOND_WAYPOINT, PLOT_WAYPOINT=PLOT_WAYPOINTS)
 
     df = pd.read_csv(filepath)
-    df['coordinates'] = df['points'].apply(parse_point)
-    plot_segment(df, linewidth=2.0, alpha=1)
-
-# 创建图例
-# legend_elements = [
-#     plt.Line2D([0], [0], color=COLOR_MAP['wg'], label='Global Path'),
-#     plt.Line2D([0], [0], color=COLOR_MAP['wf'], label='Optimized Path')
-# ]
-# ax.legend(handles=legend_elements)
+    plot_segment(df, ax, linewidth=2.0, alpha=1)
+    
     ax.view_init(elev=8, azim=-70,roll=0)
+    
     filename = os.path.basename(filepath)
     omega_t, omega_e, points = take_omega(filename)
-    ax.text2D(0.05, 0.7, f"omega_e: {params['omega_e']}, omega_t: {params['omega_t']}", transform=ax.transAxes, fontsize=10)
+    
+    if omega_t is not None:
+        ax.set_title(f"omega_t: {omega_t}, omega_e: {omega_e}")
+        # ax.text2D(...) # set_title 更适合作为标题
+    
+    # **关键修改**：保留 plt.show() 在循环内部
     plt.show()
 
 
@@ -190,6 +166,6 @@ def high_light_compare(filepath):
     df = pd.read_csv(filepath) 
     df['coordinates'] = df['points'].apply(parse_point)
     if filename.startswith('H'):
-        plot_segment(df, linewidth=2.0, alpha=1)
+        plot_segment(df, ax, linewidth=2.0, alpha=1)
     elif TEST_ALL_FILES:
-        plot_segment(df, linewidth=1.0, alpha=0.3)
+        plot_segment(df, ax, linewidth=1.0, alpha=0.3)
